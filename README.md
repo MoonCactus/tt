@@ -62,7 +62,7 @@ Examples:
   tt client1=dev "bug fix 123" # stop previous task and start another one
   tt client2=phone             # stop previous task and start a new one (other client)
   tt end                       # stop timetracking (eg. for lunch, or on shutdown)
-  tt resume client1.*wiki      # resume former task that match
+  tt resume wiki               # resume last task that match (regex allowed)
 
   tt bill client1              # cumulative time spent en client1
   tt bill client1=sysadmin     # time spent on client1 specific task
