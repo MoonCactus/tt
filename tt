@@ -53,10 +53,14 @@ if [[ "$1" == 'today' ]]; then
 	shift
 fi
 
-WORKFILE="$HOME/worktime.tt"
+WORKFILE=
+EDITOR=
 if [[ -f "$HOME/.tt" ]]; then
 	WORKFILE=$(sed -n 's/^\s*WORKFILE\s*=\s*//p' "$HOME/.tt")
+	EDITOR=$(sed -n 's/^\s*EDITOR\s*=\s*//p' "$HOME/.tt")
 fi
+[[ -z "$WORKFILE" ]] && WORKFILE="$HOME/worktime.tt"
+[[ -z "$EDITOR" ]] && EDITOR="geany"
 
 PIPED=false
 workdata=""
@@ -109,7 +113,7 @@ if [[ "$tag" = 'backup' ]]; then
 fi
 
 if [[ "$tag" = 'edit' ]]; then
-	geany "$WORKFILE"
+	"$EDITOR" "$WORKFILE"
 	exit 0
 fi
 

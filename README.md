@@ -1,6 +1,10 @@
-Bash overlay on klog timetracker (https://github.com/jotaen/klog)
+Bash overlay on klog timetracker (https://github.com/jotaen/klog).
 
-#### Warning
+### Goal
+
+I use it to finely track *and bill* my time spent on multiples clients and tasks, with one centralized log.
+
+### Warning
 
 USE AT YOUR OWN RISK. MAKE BACKUPS OF YOUR JOURNAL.
 
@@ -11,17 +15,19 @@ It was developped incrementally driven by my needs.
 So it uses only a subset of klog and it is probably even incompatible with some of klog features (eg. breaks). It abuses klog tags.
 Actually, it might even be rewritten as a standalone command-line time tracker soon or later.
 
-#### Goal
+### Usage
 
-I use it to finely track time spent for multiples clients and tasks with only one journal.
+##### Configuration
 
-Configuration is set in your `$HOME/.tt`, e.g. with this content:
+`tt` runs with one single, global journal (contrary to `klog`)
+
+It is specified in `$HOME/.tt` together with the editor you like, e.g. with this content:
 ```
 WORKFILE=/home/jeremie/workspace/klog/work.klg
 EDITOR=geany
 ```
 
-`tt` can also be piped to itself for advanced filtering and billing (see examples below).
+One very useful features is that `tt` can pipe to itself, which helps bill individual clients or projects (see examples below).
 
 #### Usage
 
@@ -52,10 +58,16 @@ The variant of `regex` is that of `grep -E`.
 Examples:
 
 ```
-  tt bill 'client1'           # cumulative time spent en client1
-  tt bill 'client1=sysadmin'  # time spent on client1 individual tasks
+  tt client1=sysadmin "upgraded dokuwiki"  # start doing some sysadmin for client 1
+  tt client1=dev "bug fix 123" # stop previous task and start another one
+  tt client2=phone             # stop previous task and start a new one (other client)
+  tt end                       # stop timetracking (eg. for lunch, or on shutdown)
+  tt resume client1.*wiki      # resume former task that match
+
+  tt bill client1              # cumulative time spent en client1
+  tt bill client1=sysadmin     # time spent on client1 specific task
 
   tt backup
-  tt keep 'client1=(dev.*|sysadmin)'| tt bill client1 > billing_report_client1_projects_dev_and_sysadmin.txt
+  tt keep 'client1=(dev.*|sysadmin)'| tt bill client1 > billing_client1_dev_and_sysadmin_only.txt
   tt discard 'client1=(dev.*|sysadmin)'| tt replace  # remove previous billed entries from journal
 ```
