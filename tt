@@ -1,0 +1,210 @@
+#!/bin/bash
+# klog quick task switch
+
+usage()
+{
+	cat <<-'EOF'
+Bash overlay on klog timetracker (https://github.com/jotaen/klog)
+
+Please do check https://github.com/MoonCactus/tt/README.md for the latest doc.
+
+Configuration is set in your `$HOME/.tt`, e.g. with this content:
+
+  WORKFILE=/home/jeremie/workspace/klog/work.klg
+  EDITOR=geany
+
+Please use only the following commands. Do not use `klog` on the journal, or make sure to have a backup.
+
+Track time for multiple clients with only one journal (defined in $HOME/.tt as WORKFILE=/home/jeremie/workspace/klog/work.klg)
+
+  * "task" is like 'client=project "optional details"
+  * "regex" variant is that of grep -E
+
+  "tt"                  show help
+  "tt task"             stop current task and start a new one
+  "tt stop"             stop current task ("tt "end" is ok as well)
+  "tt resume [regex]"   restart last task, or the last task that matches the provided regex
+
+  "tt backup"           create a timestamped backup of your journal
+  "tt cat"              dumps current log file
+  "tt edit"             edit current log file
+  "tt replace"          only when piped: replaces current journal with the standard input (dangerous)
+
+  "tt today"            dumps current stats today
+  "tt bill [task]"      show time spent on '#client' (exact match)
+
+  "tt keep [task]"      keep regex and dump a klog-compatible file
+  "tt discard [task]"   discard regex and dump a klog-compatible file
+ 
+Eg.
+
+ tt keep 'client1=(dev.*|sysadmin)'| tt bill client1 > billing_report_client1_projects_dev_and_sysadmin.txt
+ tt discard 'client1=(dev.*|sysadmin)'| tt replace  # remove previous billed entries from journal
+
+EOF
+	exit 1
+}
+
+if [[ "$#" -eq 0 ]] || [[ "$1" =~ -h$|-*help$ ]]; then
+	usage
+fi
+
+if [[ "$1" == 'today' ]]; then
+	shift
+fi
+
+WORKFILE="$HOME/worktime.tt"
+if [[ -f "$HOME/.tt" ]]; then
+	WORKFILE=$(sed -n 's/^\s*WORKFILE\s*=\s*//p' "$HOME/.tt")
+fi
+
+PIPED=false
+workdata=""
+if [ -t 0 ] ; then
+	workdata=$(cat "$WORKFILE")
+else # piped input
+	workdata=$(cat)
+	PIPED=true
+fi
+
+tag=${1}
+shift
+
+stat_tag()
+{
+	verbose='cat'
+	hidesubtag='s/Z/Z/'
+	if [[ "$1" = "-v" ]]; then verbose='tee /dev/stderr'; shift; fi
+	if [[ "$1" = "--hidetag" ]]; then hidesubtag='y'; shift; fi
+
+	local tag="$1"
+
+	if [[ "$hidesubtag" = y ]]; then
+		shift
+		if [[ $tag =~ \= ]]; then
+			hidesubtag="s/ $tag//"
+		else
+			hidesubtag="s/ $tag[:=]\([^ ]*\)/ [\1]/"
+		fi
+	fi
+
+	content=$( ( egrep "(^$)|(^[0-9-]+$)|( $tag\b)" <<< "$workdata" | $verbose |
+		NO_COLOR=1 klog report /dev/stdin |
+		grep -v ' 0m$' ) 2>&1 |
+		sed -z -e 's/[0-9-]*\n\n/\n\n/g' -e 's/\n\n\+/\n\n/g' |
+		sed -e "$hidesubtag" -e 's/^\(\s*Total\s*\)$/\n\1/' |
+		sed 's/\s\s\([0-9]\+m\)$/0h\1/')
+	printf "$content "
+	
+	awk 'NF{last=$NF} END{split(last,p,"h"); printf "%6.2fh", p[1]+p[2]/60.}' <<< $content
+}
+
+if [[ "$tag" = '-h' ]] || [[ "$tag" = '--help' ]]; then
+	usage
+fi
+
+if [[ "$tag" = 'backup' ]]; then
+	cp -av "$WORKFILE" "$WORKFILE.backup.$(date +'%Y%m%d-%H%M%S')"
+	exit 0
+fi
+
+if [[ "$tag" = 'edit' ]]; then
+	geany "$WORKFILE"
+	exit 0
+fi
+
+if [[ "$tag" = 'replace' ]]; then
+	if $PIPED; then
+		mv -v "$WORKFILE" "$WORKFILE.replaced.$(date +'%Y%m%d-%H%M%S')"
+		echo "$workdata" > "$WORKFILE"
+	else
+		echo "Fail: will not replace journal when not used in a pipe"
+	fi
+	exit 0
+fi
+
+skip_empty_dates()
+{
+	sed -z 's/\([0-9\n-]\{10\}\n\)*\([0-9-]\{10\}\)\n/\n\2\n/g'  | sed '${/[0-9\n-]\{10\}/d;}' 
+}
+
+if [[ "$tag" = 'cat' ]]; then
+	regex="${1-.*}"
+	egrep "($regex)|^[0-9]" <<< "$workdata" | skip_empty_dates | tail -100
+	exit 0
+fi
+
+if [[ "$tag" = 'bill' ]]; then
+	tag="${1}"
+	shift
+	stat_tag -v --hidetag "#$tag"
+	echo
+	
+	variants=$(sed -n "s/^[^#]*#\($tag=[^ ]*\).*/\1/p" <<< "$workdata" |sort -u)
+	echo
+	if [[ "$variants" ]]; then
+		if [[ "$tag" ]]; then
+			printf "Subtotals for #$tag:\n"
+		else
+			printf "Subtotals:\n"
+		fi
+		for t in $variants; do
+			c=$(stat_tag --hidetag "#$t" | tail -1 | sed 's/^ *//')
+			printf "  * %-14s %17s\n" "${t#$tag=}:" "$c"
+		done
+	fi
+	
+	exit 0
+fi
+
+if [[ "$tag" = 'keep' ]]; then
+	tag="${1}"
+	shift
+	egrep "(^$)|(^[0-9-]+$)|( #$tag\b)" <<< "$workdata" | sed -z -e 's/[0-9-]*\n\n/\n\n/g' -e 's/\n\n\+/\n\n/g'
+	exit 0
+fi
+
+if [[ "$tag" = 'discard' ]]; then
+	tag="${1}"
+	shift
+	egrep -v "( #$tag\b)" <<< "$workdata" | sed -z -e 's/[0-9-]*\n\n/\n\n/g' -e 's/\n\n\+/\n\n/g'
+	exit 0
+fi
+
+if [[ "$tag" =~ ^stats?$ ]]; then
+	tags=$(grep -oh "\w*#[a-z]*\w*" <<< "$workdata" | sort -u)
+	for tag in $tags; do
+		echo
+		echo "======= $tag ======="
+		stat_tag "$tag"
+		echo
+	done
+	exit 0
+fi
+
+if [[ -z "$tag" ]]; then
+	today=$(date +'%Y-%m-%d')
+	klog tags --since=$today /dev/stdin <<< "$workdata"
+	exit 0
+fi
+
+if $PIPED; then
+	echo "tt cannot operate on file when piped."
+	exit 1
+fi
+
+if klog print "$WORKFILE" | grep -qF ' - ?'; then
+	klog stop "$WORKFILE"
+fi
+
+if [[ "$tag" = 'resume' ]]; then
+	lastmatch='#'
+	if [[ $# -ge 1 ]]; then
+		lastmatch="#.*$1"
+		shift
+	fi
+	lasttag=$(egrep "$lastmatch" "$WORKFILE" | sed '/^$/!h;$!d;g' | sed 's/^[^#]*//')
+	klog start -s "$lasttag" "$WORKFILE"
+elif [[ "$tag" != 'stop' ]] && [[ "$tag" != 'end' ]]; then
+	klog start -s "#$tag $@" "$WORKFILE"
+fi
