@@ -1,6 +1,6 @@
 Bash overlay on klog timetracker (https://github.com/jotaen/klog)
 
-#### Warning ####
+#### Warning
 
 USE AT YOUR OWN RISK. MAKE BACKUPS OF YOUR JOURNAL.
 
@@ -11,7 +11,7 @@ It was developped incrementally driven by my needs.
 So it uses only a subset of klog and it is probably even incompatible with some of klog features (eg. breaks). It abuses klog tags.
 Actually, it might even be rewritten as a standalone command-line time tracker soon or later.
 
-#### Goal ####
+#### Goal
 
 I use it to finely track time spent for multiples clients and tasks with only one journal.
 
@@ -23,7 +23,7 @@ EDITOR=geany
 
 `tt` can also be piped to itself for advanced filtering and billing (see examples below).
 
-#### Usage ####
+#### Usage
 
 Use `tt --help` for the latest info.
 
@@ -55,6 +55,7 @@ Examples:
   tt bill 'client1'           # cumulative time spent en client1
   tt bill 'client1=sysadmin'  # time spent on client1 individual tasks
 
+  tt backup
   tt keep 'client1=(dev.*|sysadmin)'| tt bill client1 > billing_report_client1_projects_dev_and_sysadmin.txt
   tt discard 'client1=(dev.*|sysadmin)'| tt replace  # remove previous billed entries from journal
 ```
