@@ -31,7 +31,7 @@ Track time for multiple clients with only one journal (defined in $HOME/.tt as W
   "tt replace"          only when piped: replaces current journal with the standard input (dangerous)
 
   "tt today"            dumps current stats today
-  "tt bill [task]"      show time spent on '#client' (exact match)
+  "tt bill [task]"      show time spent on '#client' (exact match). Entries tagged with "free_" prefix have an additional reported sum.
 
   "tt keep [task]"      keep regex and dump a klog-compatible file
   "tt discard [task]"   discard regex and dump a klog-compatible file
@@ -156,6 +156,14 @@ if [[ "$tag" = 'bill' ]]; then
 			c=$(stat_tag --hidetag "#$t" | tail -1 | sed 's/^ *//')
 			printf "  * %-14s %17s\n" "${t#$tag=}:" "$c"
 		done
+
+		free_time=$(for t in $variants; do
+			if [[ "$t" =~ ^${tag}=free_ ]]; then
+				stat_tag --hidetag "#$t" | tail -1 | sed 's/.* \([0-9.]*\).*/\1/' # | awk '{printf("%s ",$2);}' 
+				echo
+			fi
+		done | paste -sd+ | bc)
+		[[ -n "$free_time" ]] && echo -e "\nTotal free time: ${free_time}h"
 	fi
 	
 	exit 0
